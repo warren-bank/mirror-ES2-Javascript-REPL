@@ -29,6 +29,12 @@ export const REPL: React.FC = () => {
         return ctx;
     });
 
+    const [inputState, setInputState] = useState({
+        inputHistory: [],
+        inputHistoryIndex: -1,
+        lastResult: null
+    });
+
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const outputRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +47,11 @@ export const REPL: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isRunning) return;
+
+        inputState.inputHistory.push(input);
+        inputState.inputHistoryIndex = -1;
+        inputState.lastResult = null;
+        setInputState(inputState);
 
         const inputEntry: REPLEntry = {
             id: Date.now(),
@@ -55,6 +66,11 @@ export const REPL: React.FC = () => {
         try {
             const result = await runInContext(input, context);
             const value = result.hasValue ? result.value : undefined;
+
+            if (value) {
+                inputState.lastResult = (typeof value === 'string') ? value : JSON.stringify(value, null, 2);
+                setInputState(inputState);
+            }
 
             const outputEntry: REPLEntry = {
                 id: Date.now() + 1,
@@ -78,34 +94,69 @@ export const REPL: React.FC = () => {
         }
 
         setInput("");
-        inputRef.focus();
+        if (inputRef && inputRef.current) inputRef.current.focus();
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        if (e.key === "Enter") {
             e.preventDefault();
-            handleSubmit(e as any);
+
+            if (e.ctrlKey || e.metaKey)
+                setInput(input + "\n");
+            else
+                handleSubmit(e as any);
+        }
+        if (e.key === ";") {
+            e.preventDefault();
+
+            setInput(input + ";\n");
         }
         else if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            if (entries.length) {
-                const last_entry = entries[entries.length - 1];
-                if (last_entry && (last_entry.type === 'output') && last_entry.content) {
-                    try {
-                        navigator.clipboard.writeText(String(last_entry.content));
-                    }
-                    catch(e) {}
+
+            if (inputState.lastResult) {
+                try {
+                    navigator.clipboard.writeText(inputState.lastResult);
                 }
+                catch(e) {}
+            }
+        }
+        else if (e.key === "ArrowUp") {
+            e.preventDefault();
+
+            if (inputState.inputHistory.length) {
+              if ((inputState.inputHistoryIndex <= 0) || (inputState.inputHistoryIndex >= inputState.inputHistory.length))
+                  inputState.inputHistoryIndex = inputState.inputHistory.length;
+
+              inputState.inputHistoryIndex -= 1;
+              setInput(inputState.inputHistory[inputState.inputHistoryIndex]);
+            }
+        }
+        else if (e.key === "ArrowDown") {
+            e.preventDefault();
+
+            if (inputState.inputHistory.length) {
+              if ((inputState.inputHistoryIndex < 0) || (inputState.inputHistoryIndex >= inputState.inputHistory.length - 1))
+                  inputState.inputHistoryIndex = -1;
+
+              inputState.inputHistoryIndex += 1;
+              setInput(inputState.inputHistory[inputState.inputHistoryIndex]);
             }
         }
         else if (e.key === "Escape") {
             e.preventDefault();
+
             clearHistory();
         }
     };
 
     const clearHistory = () => {
         setEntries([]);
+
+        inputState.inputHistory = [];
+        inputState.inputHistoryIndex = -1;
+        inputState.lastResult = null;
+        setInputState(inputState);
     };
 
     const getValueTypeClass = (value: Value): string => {
@@ -196,7 +247,7 @@ export const REPL: React.FC = () => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Enter JavaScript code... (Ctrl/Cmd + Enter to run)"
+                        placeholder="Enter JavaScript code... (Enter to run)"
                         className="repl-input"
                         rows={3}
                         disabled={isRunning}
@@ -205,9 +256,11 @@ export const REPL: React.FC = () => {
                         {isRunning ? "Running..." : "Run"}
                     </button>
                 </div>
-                <div className="repl-hint">Tip: Press <i>Ctrl/Cmd + Enter</i> to execute, or click the <i>Run</i> button.</div>
-                <div className="repl-hint">Tip: Press <i>Ctrl/Cmd + C</i> to copy last result.</div>
-                <div className="repl-hint">Tip: Press <i>Esc</i> to clear history, or click the <i>Clear History</i> button.</div>
+                <div className="repl-hint">Tip: Press <i>Enter</i> to execute the input, or click the <i>Run</i> button.</div>
+                <div className="repl-hint">Tip: Press <i>Ctrl/Cmd + Enter</i> or <i>;</i> to insert a <i>Carriage Return</i>.</div>
+                <div className="repl-hint">Tip: Press <i>Up</i> or <i>Down</i> arrows to cycle through the input history.</div>
+                <div className="repl-hint">Tip: Press <i>Ctrl/Cmd + C</i> to copy the last result.</div>
+                <div className="repl-hint">Tip: Press <i>Esc</i> to clear the history, or click the <i>Clear History</i> button.</div>
             </form>
         </div>
     );
