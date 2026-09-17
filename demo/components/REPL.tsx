@@ -78,12 +78,29 @@ export const REPL: React.FC = () => {
         }
 
         setInput("");
+        inputRef.focus();
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             handleSubmit(e as any);
+        }
+        else if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (entries.length) {
+                const last_entry = entries[entries.length - 1];
+                if (last_entry && (last_entry.type === 'output') && last_entry.content) {
+                    try {
+                        navigator.clipboard.writeText(String(last_entry.content));
+                    }
+                    catch(e) {}
+                }
+            }
+        }
+        else if (e.key === "Escape") {
+            e.preventDefault();
+            clearHistory();
         }
     };
 
@@ -188,7 +205,9 @@ export const REPL: React.FC = () => {
                         {isRunning ? "Running..." : "Run"}
                     </button>
                 </div>
-                <div className="repl-hint">Tip: Press Ctrl/Cmd + Enter to execute, or click the Run button</div>
+                <div className="repl-hint">Tip: Press <i>Ctrl/Cmd + Enter</i> to execute, or click the <i>Run</i> button.</div>
+                <div className="repl-hint">Tip: Press <i>Ctrl/Cmd + C</i> to copy last result.</div>
+                <div className="repl-hint">Tip: Press <i>Esc</i> to clear history, or click the <i>Clear History</i> button.</div>
             </form>
         </div>
     );
